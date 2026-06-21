@@ -32,9 +32,9 @@ object Ip4pResolver {
      *
      * @return [Ip4pResult.Success] if resolution succeeds, or a specific error type.
      */
-    suspend fun resolveToUrl(hostname: String): Ip4pResult {
+    suspend fun resolveToUrl(hostname: String, https: Boolean = false): Ip4pResult {
         // Try raw IP4P address first (instant, no network)
-        Ip4pParser.toUrl(hostname)?.let { url ->
+        Ip4pParser.toUrl(hostname, https)?.let { url ->
             val data = Ip4pParser.parse(hostname)!!
             Timber.d("IP4P raw parse: $hostname → $url")
             return Ip4pResult.Success(data.ipv4, data.port, url)
@@ -47,7 +47,7 @@ object Ip4pResolver {
             return Ip4pResult.InvalidFormat
         }
 
-        return resolveViaDns(hostname)
+        return resolveViaDns(hostname, https)
     }
 
     /**
@@ -92,7 +92,8 @@ object Ip4pResolver {
     /**
      * DNS AAAA resolution with timeout and detailed error reporting.
      */
-    private suspend fun resolveViaDns(hostname: String): Ip4pResult = withContext(Dispatchers.IO) {
+    private suspend fun resolveViaDns(hostname: String, https: Boolean = false): Ip4pResult = withContext(Dispatchers.IO) {
+        val scheme = if (https) "https" else "http"
         try {
             val addresses = withTimeoutOrNull(DNS_TIMEOUT) {
                 InetAddress.getAllByName(hostname)
@@ -113,7 +114,7 @@ object Ip4pResolver {
                 }
 
             if (ip4pAddr != null) {
-                val url = "http://${ip4pAddr.ipv4}:${ip4pAddr.port}"
+                val url = "$scheme://${ip4pAddr.ipv4}:${ip4pAddr.port}"
                 Timber.i("IP4P DNS resolved: $hostname → $url")
                 Ip4pResult.Success(ip4pAddr.ipv4, ip4pAddr.port, url)
             } else {

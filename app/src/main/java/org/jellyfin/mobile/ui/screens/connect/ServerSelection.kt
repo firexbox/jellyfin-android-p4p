@@ -80,6 +80,7 @@ fun ServerSelection(
     var checkUrlState by remember<MutableState<CheckUrlState>> { mutableStateOf(CheckUrlState.Unchecked) }
     var externalError by remember { mutableStateOf(showExternalConnectionError) }
     var isIp4pMode by remember { mutableStateOf(false) }
+    var ip4pHttps by remember { mutableStateOf(false) }
 
     // Capture IP4P error strings in composable scope for use in onSubmit
     val ip4pErrorInvalidFormat = stringResource(R.string.ip4p_error_invalid_format)
@@ -134,7 +135,7 @@ fun ServerSelection(
             // domain/IP4P address is stored for re-resolution on reconnect.
             checkUrlState = CheckUrlState.Pending
             coroutineScope.launch {
-                when (val result = Ip4pResolver.resolveToUrl(hostname)) {
+                when (val result = Ip4pResolver.resolveToUrl(hostname, ip4pHttps)) {
                     is Ip4pResult.Success -> onConnected(hostname, true)
                     is Ip4pResult.InvalidFormat -> checkUrlState = CheckUrlState.Error(ip4pErrorInvalidFormat)
                     is Ip4pResult.DnsTimeout -> checkUrlState = CheckUrlState.Error(ip4pErrorDnsTimeout)
@@ -174,12 +175,14 @@ fun ServerSelection(
                     },
                     loading = checkUrlState is CheckUrlState.Pending,
                     isIp4pMode = isIp4pMode,
+                    ip4pHttps = ip4pHttps,
                     ip4pPreview = ip4pPreview,
                     onIp4pModeChange = {
                         isIp4pMode = it
                         externalError = false
                         checkUrlState = CheckUrlState.Unchecked
                     },
+                    onIp4pHttpsChange = { ip4pHttps = it },
                     onTextChange = { value ->
                         externalError = false
                         checkUrlState = CheckUrlState.Unchecked
@@ -218,8 +221,10 @@ private fun AddressSelection(
     errorText: String?,
     loading: Boolean,
     isIp4pMode: Boolean,
+    ip4pHttps: Boolean,
     ip4pPreview: Ip4pParser.Ip4pData?,
     onIp4pModeChange: (Boolean) -> Unit,
+    onIp4pHttpsChange: (Boolean) -> Unit,
     onTextChange: (String) -> Unit,
     onDiscoveryClick: () -> Unit,
     onSubmit: () -> Unit,
@@ -236,6 +241,12 @@ private fun AddressSelection(
             checked = isIp4pMode,
             onCheckedChange = onIp4pModeChange,
         )
+        if (isIp4pMode) {
+            HttpsToggle(
+                checked = ip4pHttps,
+                onCheckedChange = onIp4pHttpsChange,
+            )
+        }
         Ip4pPreview(preview = ip4pPreview)
         if (!loading) {
             Spacer(modifier = Modifier.height(12.dp))
@@ -337,6 +348,31 @@ private fun Ip4pToggle(
             text = stringResource(R.string.ip4p_toggle_label),
             style = MaterialTheme.typography.body2,
             color = MaterialTheme.colors.onSurface,
+        )
+    }
+}
+
+@Stable
+@Composable
+private fun HttpsToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 2.dp, bottom = 2.dp),
+    ) {
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.padding(end = 8.dp),
+        )
+        Text(
+            text = "HTTPS",
+            style = MaterialTheme.typography.body2,
+            color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f),
         )
     }
 }

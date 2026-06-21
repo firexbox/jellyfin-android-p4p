@@ -95,25 +95,27 @@ object Ip4pParser {
     }
 
     /**
-     * Converts an IP4P address to HTTP URL candidates.
+     * Converts an IP4P address to HTTP/HTTPS URL candidates.
      * Returns both port interpretations as distinct URLs (direct hex + byte-swapped),
      * so the SDK's server discovery can probe both and select the working one.
      */
-    fun toUrls(address: String): List<String> {
+    fun toUrls(address: String, https: Boolean = false): List<String> {
         val data = parse(address) ?: return emptyList()
+        val scheme = if (https) "https" else "http"
         return listOf(
-            "http://${data.ipv4}:${data.port}",
-            "http://${data.ipv4}:${data.portSwapped}",
+            "$scheme://${data.ipv4}:${data.port}",
+            "$scheme://${data.ipv4}:${data.portSwapped}",
         ).distinct()
     }
 
     /**
-     * Converts an IP4P address to a single HTTP URL using the direct port
+     * Converts an IP4P address to a single URL using the direct port
      * interpretation (the port hex group read as a 16-bit integer).
      * This matches the IP4P spec `2001::{port}:{hi16}:{lo16}`.
      */
-    fun toUrl(address: String): String? {
+    fun toUrl(address: String, https: Boolean = false): String? {
         val data = parse(address) ?: return null
-        return "http://${data.ipv4}:${data.port}"
+        val scheme = if (https) "https" else "http"
+        return "$scheme://${data.ipv4}:${data.port}"
     }
 }
