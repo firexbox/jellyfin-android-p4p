@@ -126,10 +126,10 @@ natmap creates port mapping → STUN discovers public IP:port
 ```
 2001::{port}:{ipv4-hi16}:{ipv4-lo16}
 
-Example: 2001::2fcb:df58:3d07
-  → IPv4: 223.88.61.7
-  → Port: 12235
-  → URL:  http://223.88.61.7:12235
+Example: 2001::1f90:cb00:7101
+  → IPv4: 203.0.113.1
+  → Port: 8080
+  → URL:  http://203.0.113.1:8080
 ```
 
 ### Usage
