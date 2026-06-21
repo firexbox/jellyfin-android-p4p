@@ -107,7 +107,14 @@ abstract class JellyfinWebViewClient(
     }
 
     override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
-        Timber.e("Received SSL error: %s", error.toString())
-        handler.cancel()
+        // For IP4P HTTPS connections, the TLS certificate hostname doesn't match the
+        // resolved IP address. We allow this because the IP was verified via IP4P DNS.
+        if (server.isIp4p) {
+            Timber.w("Allowing SSL error for IP4P server: %s", error.toString())
+            handler.proceed()
+        } else {
+            Timber.e("Received SSL error: %s", error.toString())
+            handler.cancel()
+        }
     }
 }
