@@ -2,10 +2,12 @@ package org.jellyfin.mobile.utils
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.UnknownHostException
 import timber.log.Timber
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * DNS-based IP4P address resolver.
@@ -18,11 +20,38 @@ import timber.log.Timber
  */
 object Ip4pResolver {
 
+    /** DNS resolution timeout. */
+    private val DNS_TIMEOUT = 5.seconds
+
+    /**
+     * Resolves an IP4P hostname (raw IP4P address or domain with IP4P AAAA record)
+     * to a connectable HTTP URL.
+     *
+     * Tries raw [Ip4pParser] parsing first (instant), then falls back to DNS AAAA
+     * resolution with a [DNS_TIMEOUT].
+     *
+     * @return [Ip4pResult.Success] if resolution succeeds, or a specific error type.
+     */
+    suspend fun resolveToUrl(hostname: String): Ip4pResult {
+        // Try raw IP4P address first (instant, no network)
+        Ip4pParser.toUrl(hostname)?.let { url ->
+            val data = Ip4pParser.parse(hostname)!!
+            Timber.d("IP4P raw parse: $hostname → $url")
+            return Ip4pResult.Success(data.ipv4, data.port, url)
+        }
+
+        // For domain names, try DNS AAAA resolution
+        // But first check if it even looks like a domain (not an IP address)
+        if (Ip4pParser.isIp4p(hostname)) {
+            // It looks like IP4P format but parse failed → invalid format
+            return Ip4pResult.InvalidFormat
+        }
+
+        return resolveViaDns(hostname)
+    }
+
     /**
      * Resolves [hostname] via DNS and checks AAAA results for IP4P-encoded addresses.
-     *
-     * @return Decoded [Ip4pParser.Ip4pData] if an IP4P address is found in the DNS results,
-     *         or `null` if the hostname cannot be resolved or has no IP4P AAAA records.
      */
     suspend fun resolve(hostname: String): Ip4pParser.Ip4pData? = withContext(Dispatchers.IO) {
         // Skip DNS resolution if the input already looks like an IP4P address
@@ -31,7 +60,15 @@ object Ip4pResolver {
         }
 
         try {
-            val addresses = InetAddress.getAllByName(hostname)
+            val addresses = withTimeoutOrNull(DNS_TIMEOUT) {
+                InetAddress.getAllByName(hostname)
+            }
+
+            if (addresses == null) {
+                Timber.w("DNS timeout for $hostname")
+                return@withContext null
+            }
+
             Timber.d("Resolved $hostname → ${addresses.map { it.hostAddress }}")
 
             addresses
@@ -53,25 +90,42 @@ object Ip4pResolver {
     }
 
     /**
-     * Resolves an IP4P hostname (raw IP4P address or domain with IP4P AAAA record)
-     * to a connectable HTTP URL.
-     *
-     * Tries raw [Ip4pParser] parsing first (instant), then falls back to DNS AAAA
-     * resolution. Returns `null` if the hostname cannot be resolved as IP4P.
+     * DNS AAAA resolution with timeout and detailed error reporting.
      */
-    suspend fun resolveToUrl(hostname: String): String? {
-        // Try raw IP4P address first (instant, no network)
-        Ip4pParser.toUrl(hostname)?.let { url ->
-            Timber.d("IP4P raw parse: $hostname → $url")
-            return url
+    private suspend fun resolveViaDns(hostname: String): Ip4pResult = withContext(Dispatchers.IO) {
+        try {
+            val addresses = withTimeoutOrNull(DNS_TIMEOUT) {
+                InetAddress.getAllByName(hostname)
+            }
+
+            if (addresses == null) {
+                Timber.w("DNS timeout resolving $hostname")
+                return@withContext Ip4pResult.DnsTimeout
+            }
+
+            Timber.d("Resolved $hostname → ${addresses.map { it.hostAddress }}")
+
+            val ip4pAddr = addresses
+                .filterIsInstance<Inet6Address>()
+                .map { it.hostAddress?.lowercase() }
+                .firstNotNullOfOrNull { addr ->
+                    if (addr != null) Ip4pParser.parse(addr) else null
+                }
+
+            if (ip4pAddr != null) {
+                val url = "http://${ip4pAddr.ipv4}:${ip4pAddr.port}"
+                Timber.i("IP4P DNS resolved: $hostname → $url")
+                Ip4pResult.Success(ip4pAddr.ipv4, ip4pAddr.port, url)
+            } else {
+                Timber.w("No IP4P AAAA record found for $hostname")
+                Ip4pResult.NoIp4pRecord
+            }
+        } catch (e: UnknownHostException) {
+            Timber.d(e, "DNS resolution failed for $hostname")
+            Ip4pResult.DnsError(e.message)
+        } catch (e: Exception) {
+            Timber.e(e, "Unexpected error resolving $hostname")
+            Ip4pResult.DnsError(e.message)
         }
-        // Try DNS AAAA resolution
-        val data = resolve(hostname)
-        if (data != null) {
-            val url = "http://${data.ipv4}:${data.port}"
-            Timber.i("IP4P DNS resolved: $hostname → $url")
-            return url
-        }
-        return null
     }
 }

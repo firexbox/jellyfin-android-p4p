@@ -38,6 +38,7 @@ import org.jellyfin.mobile.utils.BackPressInterceptor
 import org.jellyfin.mobile.utils.Constants
 import org.jellyfin.mobile.utils.Ip4pParser
 import org.jellyfin.mobile.utils.Ip4pResolver
+import org.jellyfin.mobile.utils.Ip4pResult
 import timber.log.Timber
 import org.jellyfin.mobile.utils.Constants.FRAGMENT_WEB_VIEW_EXTRA_SERVER
 import org.jellyfin.mobile.utils.applyDefault
@@ -107,6 +108,15 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
                 runOnUiThread {
                     webViewBinding.loadingContainer.isVisible = false
                     webView.fadeIn()
+                }
+                if (server.isIp4p) {
+                    runOnUiThread {
+                        Toast.makeText(
+                            requireContext(),
+                            getString(R.string.ip4p_connected_to, server.hostname),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
                 }
                 requestNoBatteryOptimizations(webViewBinding.root)
             }
@@ -202,7 +212,7 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
             // IP4P server: resolve asynchronously (DNS AAAA lookup for domains,
             // or raw IP4P parse for direct addresses), then load the decoded URL.
             lifecycleScope.launch {
-                val url = Ip4pResolver.resolveToUrl(server.hostname) ?: server.hostname
+                val resolved = Ip4pResolver.resolveToUrl(server.hostname); val url = (resolved as? Ip4pResult.Success)?.url ?: server.hostname
                 loadUrl(url)
                 postDelayed(timeoutRunnable, Constants.INITIAL_CONNECTION_TIMEOUT)
                 postDelayed(showLoadingContainerRunnable, Constants.SHOW_PROGRESS_BAR_DELAY)
@@ -284,7 +294,7 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
             ip4pRetried = true
             Timber.i("IP4P connection failed, retrying with fresh DNS resolution")
             lifecycleScope.launch {
-                val url = Ip4pResolver.resolveToUrl(server.hostname) ?: server.hostname
+                val resolved = Ip4pResolver.resolveToUrl(server.hostname); val url = (resolved as? Ip4pResult.Success)?.url ?: server.hostname
                 webViewBinding?.webView?.loadUrl(url)
                 // Reset retry flag after a successful load (handled in onConnectedToWebapp)
             }

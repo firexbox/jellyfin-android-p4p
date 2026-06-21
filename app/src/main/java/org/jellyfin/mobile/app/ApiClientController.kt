@@ -9,6 +9,7 @@ import org.jellyfin.mobile.data.entity.ServerUser
 import org.jellyfin.mobile.data.entity.UserEntity
 import org.jellyfin.mobile.utils.Ip4pParser
 import org.jellyfin.mobile.utils.Ip4pResolver
+import org.jellyfin.mobile.utils.Ip4pResult
 import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.DeviceInfo
@@ -132,5 +133,8 @@ class ApiClientController(
      * Resolve an IP4P hostname (raw IP4P address or domain with IP4P AAAA record)
      * to an HTTP URL. Returns null if the hostname cannot be resolved as IP4P.
      */
-    private suspend fun resolveIp4pUrl(hostname: String): String? = Ip4pResolver.resolveToUrl(hostname)
+    private suspend fun resolveIp4pUrl(hostname: String): String? {
+        val result = Ip4pResolver.resolveToUrl(hostname)
+        return (result as? Ip4pResult.Success)?.url
+    }
 }

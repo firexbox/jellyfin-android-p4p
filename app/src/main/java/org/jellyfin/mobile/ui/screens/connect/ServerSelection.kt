@@ -60,6 +60,7 @@ import org.jellyfin.mobile.ui.state.ServerSelectionMode
 import org.jellyfin.mobile.ui.utils.CenterRow
 import org.jellyfin.mobile.utils.Ip4pParser
 import org.jellyfin.mobile.utils.Ip4pResolver
+import org.jellyfin.mobile.utils.Ip4pResult
 import org.koin.compose.koinInject
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -80,8 +81,11 @@ fun ServerSelection(
     var externalError by remember { mutableStateOf(showExternalConnectionError) }
     var isIp4pMode by remember { mutableStateOf(false) }
 
-    // Capture IP4P parse error string in composable scope for use in onSubmit
-    val ip4pParseError = stringResource(R.string.ip4p_parse_error)
+    // Capture IP4P error strings in composable scope for use in onSubmit
+    val ip4pErrorInvalidFormat = stringResource(R.string.ip4p_error_invalid_format)
+    val ip4pErrorDnsTimeout = stringResource(R.string.ip4p_error_dns_timeout)
+    val ip4pErrorNoRecord = stringResource(R.string.ip4p_error_no_record)
+    val ip4pErrorDnsFailed = stringResource(R.string.ip4p_error_dns_failed)
 
     // Preview decoded IP4P address while typing (instant, no network)
     val ip4pPreview = if (isIp4pMode) Ip4pParser.parse(hostname) else null
@@ -130,11 +134,12 @@ fun ServerSelection(
             // domain/IP4P address is stored for re-resolution on reconnect.
             checkUrlState = CheckUrlState.Pending
             coroutineScope.launch {
-                val data = Ip4pParser.parse(hostname) ?: Ip4pResolver.resolve(hostname)
-                if (data != null) {
-                    onConnected(hostname, true)
-                } else {
-                    checkUrlState = CheckUrlState.Error(ip4pParseError)
+                when (val result = Ip4pResolver.resolveToUrl(hostname)) {
+                    is Ip4pResult.Success -> onConnected(hostname, true)
+                    is Ip4pResult.InvalidFormat -> checkUrlState = CheckUrlState.Error(ip4pErrorInvalidFormat)
+                    is Ip4pResult.DnsTimeout -> checkUrlState = CheckUrlState.Error(ip4pErrorDnsTimeout)
+                    is Ip4pResult.NoIp4pRecord -> checkUrlState = CheckUrlState.Error(ip4pErrorNoRecord)
+                    is Ip4pResult.DnsError -> checkUrlState = CheckUrlState.Error(ip4pErrorDnsFailed)
                 }
             }
         } else {

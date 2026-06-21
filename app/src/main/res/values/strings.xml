@@ -26,7 +26,11 @@
     <!-- IP4P -->
     <string name="ip4p_toggle_label">IP4P address</string>
     <string name="ip4p_toggle_description">Address uses IP4P format (natmap NAT traversal)</string>
-    <string name="ip4p_parse_error">Invalid IP4P address format.\nExpected: 2001::port:ip4hi:ip4lo</string>
+    <string name="ip4p_error_invalid_format">Invalid IP4P address format.\nExpected: 2001::port:ip4hi:ip4lo</string>
+    <string name="ip4p_error_dns_timeout">DNS resolution timed out.\nCheck your network connection and try again.</string>
+    <string name="ip4p_error_no_record">No IP4P AAAA record found for this domain.\nVerify that natmap is running and the DNS record is configured.</string>
+    <string name="ip4p_error_dns_failed">DNS resolution failed.\nCheck the domain name and your network connection.</string>
+    <string name="ip4p_connected_to">Connected via IP4P: %1$s</string>
 
     <string name="bluetooth_permission_title">Allow Bluetooth access?</string>
     <string name="bluetooth_permission_message">To detect when wireless headphones or speakers are disconnected, the app requires Bluetooth access. On Android, this permission is described as access to nearby devices, and warns that Bluetooth devices can be used to infer the current location. However, the Jellyfin app will never use this permission to detect your location.</string>
